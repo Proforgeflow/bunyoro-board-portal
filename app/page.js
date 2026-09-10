@@ -1,87 +1,136 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { supabase } from '../lib/supabaseClient';
 
-export default function Dashboard() {
-  const [members, setMembers] = useState([]);
-  const [totalCapital, setTotalCapital] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [errorMsg, setErrorMsg] = useState(null);
+export default function AuthPage() {
+  const router = useRouter();
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
 
-  const fetchBoardData = async () => {
+  async function handleAuth(e) {
+    e.preventDefault();
+    setLoading(true);
+    setErrorMsg('');
+
     try {
-      const { data, error } = await supabase.from('board_members').select('*');
-      if (error) {
-        setErrorMsg(error.message);
-      } else if (data) {
-        setMembers(data);
-        const total = data.reduce((sum, item) => sum + Number(item.total_contributions_ugx || 0), 0);
-        setTotalCapital(total);
+      if (isSignUp) {
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: { full_name: fullName }
+          }
+        });
+
+        if (error) throw error;
+
+        // Auto-login fallback if session wasn't created immediately
+        if (!data.session) {
+          const { error: signInErr } = await supabase.auth.signInWithPassword({ email, password });
+          if (signInErr) throw signInErr;
+        }
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({
+          email,
+          password
+        });
+
+        if (error) throw error;
+      }
+
+      // Verify active session exists before redirecting
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (sessionData.session) {
+        router.push('/dashboard');
+      } else {
+        setErrorMsg('Session creation failed. Please check your Supabase Email settings.');
+        setLoading(false);
       }
     } catch (err) {
       setErrorMsg(err.message);
-    } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchBoardData();
-  }, []);
+  }
 
   return (
-    <main className="min-h-screen bg-slate-950 text-white p-8">
-      <header className="max-w-6xl mx-auto flex justify-between items-center border-b border-slate-800 pb-6">
-        <div>
-          <h1 className="text-2xl font-bold tracking-wide">Bunyoro Muhama Real Estates LTD</h1>
-          <p className="text-slate-400 text-sm">Board of Governors Governance Portal</p>
+    <div className="min-h-screen bg-slate-950 flex flex-col justify-center items-center p-4 text-slate-100">
+      <div className="max-w-md w-full bg-slate-900 border border-slate-800 p-8 rounded-3xl shadow-2xl space-y-6">
+        <div className="text-center space-y-2">
+          <h1 className="text-2xl font-black tracking-tight text-white">Bunyoro Omuhama Real Estate</h1>
+          <p className="text-xs text-amber-400 font-bold uppercase tracking-wider">
+            {isSignUp ? 'Create Shareholder Account' : 'Executive Board Portal Login'}
+          </p>
         </div>
-        <div className="bg-emerald-950 border border-emerald-500/40 px-4 py-2 rounded-lg text-right">
-          <p className="text-xs text-emerald-400 font-semibold tracking-wider">TOTAL TREASURY BALANCE</p>
-          <p className="text-2xl font-mono text-emerald-300">UGX {totalCapital.toLocaleString()}</p>
-        </div>
-      </header>
 
-      <section className="max-w-6xl mx-auto mt-8">
-        {loading && <p className="text-slate-400">Loading board records...</p>}
         {errorMsg && (
-          <div className="text-red-400 bg-red-950/50 p-4 rounded border border-red-800">
-            <p className="font-bold">Database Error:</p>
-            <p className="text-sm mt-1">{errorMsg}</p>
+          <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-xs text-red-400 font-medium">
+            {errorMsg}
           </div>
         )}
-        {!loading && !errorMsg && members.length === 0 && (
-          <p className="text-slate-400">No board member records found in Supabase table.</p>
-        )}
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4">
-          {members.map((m) => (
-            <div key={m.id} className="bg-slate-900 border border-slate-800 rounded-xl p-6 relative overflow-hidden">
-              <div className="flex items-center gap-4">
-                <img
-                  src={m.photo_url || 'https://via.placeholder.com/150'}
-                  alt={m.full_name}
-                  className="w-16 h-16 rounded-full object-cover border-2 border-emerald-500"
-                />
-                <div>
-                  <h2 className="font-bold text-lg">{m.full_name}</h2>
-                  <p className="text-xs text-slate-400">Age: {m.age} | {m.residential_address}</p>
-                </div>
-              </div>
-              <div className="mt-4 pt-4 border-t border-slate-800/80 text-sm space-y-1">
-                <p className="text-slate-400">
-                  Next of Kin: <span className="text-slate-200">{m.next_of_kin_name} ({m.next_of_kin_age} yrs)</span>
-                </p>
-                <p className="text-slate-400">Total Contribution:</p>
-                <p className="text-xl font-mono font-bold text-emerald-400">
-                  UGX {Number(m.total_contributions_ugx).toLocaleString()}
-                </p>
-              </div>
+        <form onSubmit={handleAuth} className="space-y-4">
+          {isSignUp && (
+            <div>
+              <label className="block text-[10px] font-black uppercase text-slate-400 mb-1">Full Legal Name</label>
+              <input
+                type="text"
+                required
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:border-amber-500 outline-none"
+                placeholder="e.g. Asuman Kusiima"
+              />
             </div>
-          ))}
+          )}
+
+          <div>
+            <label className="block text-[10px] font-black uppercase text-slate-400 mb-1">Email Address</label>
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:border-amber-500 outline-none"
+              placeholder="name@domain.com"
+            />
+          </div>
+
+          <div>
+            <label className="block text-[10px] font-black uppercase text-slate-400 mb-1">Password</label>
+            <input
+              type="password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:border-amber-500 outline-none"
+              placeholder="••••••••"
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-black py-3.5 rounded-xl text-xs uppercase tracking-wider transition-all shadow-lg shadow-amber-500/20"
+          >
+            {loading ? 'Authenticating...' : isSignUp ? 'Register & Enter Portal' : 'Sign In to Portal'}
+          </button>
+        </form>
+
+        <div className="text-center pt-2 border-t border-slate-800">
+          <button
+            onClick={() => { setIsSignUp(!isSignUp); setErrorMsg(''); }}
+            className="text-xs text-slate-400 hover:text-amber-400 transition-colors font-medium"
+          >
+            {isSignUp ? 'Already have an account? Sign In' : "Don't have an account? Register here"}
+          </button>
         </div>
-      </section>
-    </main>
+      </div>
+    </div>
   );
 }
