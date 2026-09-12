@@ -1,11 +1,13 @@
 ﻿'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/utils/supabase/client'
+import { firebaseAuth } from '@/utils/firebase'
+import { RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from 'firebase/auth'
 
 export default function AuthPage() {
   const supabase = createClient()
-  const [authMethod, setAuthMethod] = useState<'email' | 'phone'>('email')
+  const [authMethod, setAuthMethod] = useState<'email' | 'phone'>('phone')
   const [isSignUp, setIsSignUp] = useState(false)
   const [loading, setLoading] = useState(false)
 
@@ -16,8 +18,28 @@ export default function AuthPage() {
   const [phone, setPhone] = useState('')
   const [otpCode, setOtpCode] = useState('')
   const [awaitingOtp, setAwaitingOtp] = useState(false)
+  const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null)
 
-  // Email Auth
+  useEffect(() => {
+    // Setup invisible reCAPTCHA for Firebase Phone Auth
+    if (typeof window !== 'undefined' && !window.recaptchaVerifier) {
+      try {
+        window.recaptchaVerifier = new RecaptchaVerifier(firebaseAuth, 'recaptcha-container', {
+          size: 'invisible',
+          callback: () => {
+            // reCAPTCHA solved
+          },
+          'expired-callback': () => {
+            alert('reCAPTCHA expired. Please try sending SMS again.')
+          }
+        })
+      } catch (err) {
+        console.error('Firebase Recaptcha error:', err)
+      }
+    }
+  }, [])
+
+  // Email Sign In / Sign Up
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
@@ -38,54 +60,77 @@ export default function AuthPage() {
     setLoading(false)
   }
 
-  // Phone Auth (SMS OTP)
+  // Firebase SMS OTP Dispatcher
   const handleSendPhoneOtp = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
 
-    const { error } = await supabase.auth.signInWithOtp({
-      phone,
-      options: {
-        data: { full_name: fullName },
-      },
-    })
-
-    if (error) {
-      alert(error.message)
-    } else {
+    try {
+      const appVerifier = window.recaptchaVerifier
+      const confirmation = await signInWithPhoneNumber(firebaseAuth, phone, appVerifier)
+      setConfirmationResult(confirmation)
       setAwaitingOtp(true)
+    } catch (error: any) {
+      alert(`SMS Failed: ${error.message}`)
+      if (window.recaptchaVerifier) {
+        window.recaptchaVerifier.render().then((widgetId: any) => {
+          window.grecaptcha.reset(widgetId)
+        })
+      }
     }
     setLoading(false)
   }
 
+  // Verify SMS OTP
   const handleVerifyPhoneOtp = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!confirmationResult) return
     setLoading(true)
 
-    const { error } = await supabase.auth.verifyOtp({
-      phone,
-      token: otpCode,
-      type: 'sms',
-    })
+    try {
+      const userCredential = await confirmationResult.confirm(otpCode)
+      const firebaseUser = userCredential.user
 
-    if (error) {
-      alert(error.message)
-    } else {
+      // Upsert profile record into Supabase public.profiles
+      const { error } = await supabase.from('profiles').upsert({
+        id: firebaseUser.uid,
+        phone: firebaseUser.phoneNumber || phone,
+        full_name: fullName || 'Shareholder',
+        role: 'shareholder',
+        status: 'pending'
+      })
+
+      if (error) {
+        console.error('Supabase profile sync note:', error.message)
+      }
+
       window.location.href = '/dashboard'
+    } catch (error: any) {
+      alert(`Invalid OTP Code: ${error.message}`)
     }
     setLoading(false)
   }
 
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
+      {/* Invisible Recaptcha Mounting Point */}
+      <div id="recaptcha-container"></div>
+
       <div className="bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-2xl max-w-md w-full shadow-2xl space-y-6">
         <div className="text-center space-y-1">
           <span className="text-xs font-mono font-bold text-amber-500 uppercase tracking-wider">Bunyoro Omuhama Real Estates LTD</span>
           <h1 className="text-xl font-extrabold text-white">Shareholder Portal</h1>
         </div>
 
-        {/* Method Switcher Tabs */}
+        {/* Auth Method Switcher */}
         <div className="grid grid-cols-2 gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs font-semibold">
+          <button
+            type="button"
+            onClick={() => { setAuthMethod('phone'); setAwaitingOtp(false); }}
+            className={`py-2 rounded-lg transition ${authMethod === 'phone' ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-white'}`}
+          >
+            Mobile Phone (SMS)
+          </button>
           <button
             type="button"
             onClick={() => { setAuthMethod('email'); setAwaitingOtp(false); }}
@@ -93,14 +138,66 @@ export default function AuthPage() {
           >
             Email Address
           </button>
-          <button
-            type="button"
-            onClick={() => { setAuthMethod('phone'); setAwaitingOtp(false); }}
-            className={`py-2 rounded-lg transition ${authMethod === 'phone' ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-white'}`}
-          >
-            Mobile Phone
-          </button>
         </div>
+
+        {/* MOBILE PHONE FORM */}
+        {authMethod === 'phone' && !awaitingOtp && (
+          <form onSubmit={handleSendPhoneOtp} className="space-y-4 text-sm">
+            <div>
+              <label className="block text-xs font-mono text-slate-400 mb-1">Full Legal Name</label>
+              <input
+                type="text"
+                required
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                placeholder="Asuman Kusiima"
+                className="w-full bg-slate-950 border border-slate-800 p-3 rounded-xl text-white focus:outline-none focus:border-amber-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-mono text-slate-400 mb-1">Mobile Phone (Include Country Code)</label>
+              <input
+                type="tel"
+                required
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="+971552372079 or +256700000000"
+                className="w-full bg-slate-950 border border-slate-800 p-3 rounded-xl text-white font-mono focus:outline-none focus:border-amber-500"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-3 rounded-xl transition"
+            >
+              {loading ? 'Requesting SMS...' : 'Send Free SMS Code'}
+            </button>
+          </form>
+        )}
+
+        {/* OTP VERIFICATION FORM */}
+        {authMethod === 'phone' && awaitingOtp && (
+          <form onSubmit={handleVerifyPhoneOtp} className="space-y-4 text-sm">
+            <div>
+              <label className="block text-xs font-mono text-slate-400 mb-1">Enter 6-Digit SMS Code sent to {phone}</label>
+              <input
+                type="text"
+                required
+                value={otpCode}
+                onChange={(e) => setOtpCode(e.target.value)}
+                placeholder="123456"
+                className="w-full bg-slate-950 border border-slate-800 p-3 rounded-xl text-amber-400 font-mono text-center text-lg tracking-widest focus:outline-none focus:border-amber-500"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl transition"
+            >
+              {loading ? 'Verifying Code...' : 'Verify & Enter Portal'}
+            </button>
+          </form>
+        )}
 
         {/* EMAIL FORM */}
         {authMethod === 'email' && (
@@ -144,82 +241,28 @@ export default function AuthPage() {
               disabled={loading}
               className="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-3 rounded-xl transition"
             >
-              {loading ? 'Processing...' : isSignUp ? 'Create Shareholder Account' : 'Sign In to Dashboard'}
+              {loading ? 'Processing...' : isSignUp ? 'Create Account' : 'Sign In'}
             </button>
-          </form>
-        )}
-
-        {/* MOBILE PHONE FORM */}
-        {authMethod === 'phone' && !awaitingOtp && (
-          <form onSubmit={handleSendPhoneOtp} className="space-y-4 text-sm">
-            <div>
-              <label className="block text-xs font-mono text-slate-400 mb-1">Full Legal Name</label>
-              <input
-                type="text"
-                required
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                placeholder="Asuman Kusiima"
-                className="w-full bg-slate-950 border border-slate-800 p-3 rounded-xl text-white focus:outline-none focus:border-amber-500"
-              />
+            <div className="text-center pt-2">
+              <button
+                type="button"
+                onClick={() => setIsSignUp(!isSignUp)}
+                className="text-xs text-slate-400 hover:text-white underline"
+              >
+                {isSignUp ? 'Already have an account? Sign In' : 'Need an account? Register'}
+              </button>
             </div>
-            <div>
-              <label className="block text-xs font-mono text-slate-400 mb-1">Mobile Phone Number (International Format)</label>
-              <input
-                type="tel"
-                required
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="+256700000000"
-                className="w-full bg-slate-950 border border-slate-800 p-3 rounded-xl text-white font-mono focus:outline-none focus:border-amber-500"
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-3 rounded-xl transition"
-            >
-              {loading ? 'Sending SMS Code...' : 'Send SMS Verification Code'}
-            </button>
           </form>
-        )}
-
-        {/* OTP VERIFICATION FORM */}
-        {authMethod === 'phone' && awaitingOtp && (
-          <form onSubmit={handleVerifyPhoneOtp} className="space-y-4 text-sm">
-            <div>
-              <label className="block text-xs font-mono text-slate-400 mb-1">Enter 6-Digit SMS Code sent to {phone}</label>
-              <input
-                type="text"
-                required
-                value={otpCode}
-                onChange={(e) => setOtpCode(e.target.value)}
-                placeholder="123456"
-                className="w-full bg-slate-950 border border-slate-800 p-3 rounded-xl text-amber-400 font-mono text-center text-lg tracking-widest focus:outline-none focus:border-amber-500"
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl transition"
-            >
-              {loading ? 'Verifying Code...' : 'Verify & Enter Portal'}
-            </button>
-          </form>
-        )}
-
-        {authMethod === 'email' && (
-          <div className="text-center pt-2">
-            <button
-              type="button"
-              onClick={() => setIsSignUp(!isSignUp)}
-              className="text-xs text-slate-400 hover:text-white underline"
-            >
-              {isSignUp ? 'Already have an account? Sign In' : 'Need an account? Register'}
-            </button>
-          </div>
         )}
       </div>
     </div>
   )
+}
+
+// Add global window declaration for RecaptchaVerifier
+declare global {
+  interface Window {
+    recaptchaVerifier: any
+    grecaptcha: any
+  }
 }
