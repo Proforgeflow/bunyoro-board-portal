@@ -7,7 +7,7 @@ import { RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from 'fi
 
 export default function AuthPage() {
   const supabase = createClient()
-  const [authMethod, setAuthMethod] = useState<'email' | 'phone'>('phone')
+  const [authMethod, setAuthMethod] = useState<'phone' | 'email'>('phone')
   const [isSignUp, setIsSignUp] = useState(false)
   const [loading, setLoading] = useState(false)
 
@@ -27,37 +27,21 @@ export default function AuthPage() {
           size: 'invisible',
           callback: () => {},
           'expired-callback': () => {
-            alert('reCAPTCHA expired. Please try sending SMS again.')
+            alert('reCAPTCHA expired. Please request a new SMS code.')
           }
         })
       } catch (err) {
-        console.error('Firebase Recaptcha error:', err)
+        console.error('Firebase Recaptcha init error:', err)
       }
     }
   }, [])
 
-  const handleEmailAuth = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-
-    if (isSignUp) {
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: { data: { full_name: fullName } },
-      })
-      if (error) alert(error.message)
-      else window.location.href = '/dashboard'
-    } else {
-      const { error } = await supabase.auth.signInWithPassword({ email, password })
-      if (error) alert(error.message)
-      else window.location.href = '/dashboard'
-    }
-    setLoading(false)
-  }
-
   const handleSendPhoneOtp = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!phone) {
+      alert('Please enter a valid mobile phone number with country code.')
+      return
+    }
     setLoading(true)
 
     try {
@@ -66,8 +50,8 @@ export default function AuthPage() {
       setConfirmationResult(confirmation)
       setAwaitingOtp(true)
     } catch (error: any) {
-      alert(`SMS Failed: ${error.message}`)
-      if (window.recaptchaVerifier) {
+      alert(`SMS Dispatch Failed: ${error.message}`)
+      if (window.recaptchaVerifier && window.grecaptcha) {
         window.recaptchaVerifier.render().then((widgetId: any) => {
           window.grecaptcha.reset(widgetId)
         })
@@ -93,44 +77,66 @@ export default function AuthPage() {
         status: 'pending'
       })
 
-      if (error) {
-        console.error('Supabase profile sync note:', error.message)
-      }
+      if (error) console.error('Profile sync notice:', error.message)
 
       window.location.href = '/dashboard'
     } catch (error: any) {
-      alert(`Invalid OTP Code: ${error.message}`)
+      alert(`Invalid SMS Code: ${error.message}`)
+    }
+    setLoading(false)
+  }
+
+  const handleEmailAuth = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+
+    if (isSignUp) {
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: { full_name: fullName } },
+      })
+      if (error) alert(error.message)
+      else window.location.href = '/dashboard'
+    } else {
+      const { error } = await supabase.auth.signInWithPassword({ email, password })
+      if (error) alert(error.message)
+      else window.location.href = '/dashboard'
     }
     setLoading(false)
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4">
       <div id="recaptcha-container"></div>
 
       <div className="bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-2xl max-w-md w-full shadow-2xl space-y-6">
         <div className="text-center space-y-1">
-          <span className="text-xs font-mono font-bold text-amber-500 uppercase tracking-wider">Bunyoro Omuhama Real Estates LTD</span>
+          <span className="text-xs font-mono font-bold text-amber-500 uppercase tracking-wider">
+            Bunyoro Omuhama Real Estates LTD
+          </span>
           <h1 className="text-xl font-extrabold text-white">Shareholder Portal</h1>
         </div>
 
+        {/* Auth Method Switcher Tabs */}
         <div className="grid grid-cols-2 gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs font-semibold">
           <button
             type="button"
             onClick={() => { setAuthMethod('phone'); setAwaitingOtp(false); }}
-            className={`py-2 rounded-lg transition ${authMethod === 'phone' ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-white'}`}
+            className={`py-2 rounded-lg transition ${authMethod === 'phone' ? 'bg-amber-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
           >
-            Mobile Phone (SMS)
+            📱 Mobile Phone (SMS)
           </button>
           <button
             type="button"
             onClick={() => { setAuthMethod('email'); setAwaitingOtp(false); }}
-            className={`py-2 rounded-lg transition ${authMethod === 'email' ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-white'}`}
+            className={`py-2 rounded-lg transition ${authMethod === 'email' ? 'bg-amber-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
           >
-            Email Address
+            ✉️ Email Address
           </button>
         </div>
 
+        {/* PHONE OTP MODE */}
         {authMethod === 'phone' && !awaitingOtp && (
           <form onSubmit={handleSendPhoneOtp} className="space-y-4 text-sm">
             <div>
@@ -145,49 +151,62 @@ export default function AuthPage() {
               />
             </div>
             <div>
-              <label className="block text-xs font-mono text-slate-400 mb-1">Mobile Phone (Include Country Code)</label>
+              <label className="block text-xs font-mono text-slate-400 mb-1">
+                Mobile Phone (Include Country Code)
+              </label>
               <input
                 type="tel"
                 required
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="+971552372079 or +256700000000"
-                className="w-full bg-slate-950 border border-slate-800 p-3 rounded-xl text-white font-mono focus:outline-none focus:border-amber-500"
+                className="w-full bg-slate-950 border border-slate-800 p-3 rounded-xl text-amber-400 font-mono focus:outline-none focus:border-amber-500"
               />
             </div>
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-3 rounded-xl transition"
+              className="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-3 rounded-xl transition shadow-lg"
             >
-              {loading ? 'Requesting SMS...' : 'Send Free SMS Code'}
+              {loading ? 'Sending SMS...' : 'Send Free SMS Verification Code'}
             </button>
           </form>
         )}
 
+        {/* VERIFY OTP CODE MODE */}
         {authMethod === 'phone' && awaitingOtp && (
           <form onSubmit={handleVerifyPhoneOtp} className="space-y-4 text-sm">
             <div>
-              <label className="block text-xs font-mono text-slate-400 mb-1">Enter 6-Digit SMS Code sent to {phone}</label>
+              <label className="block text-xs font-mono text-slate-400 mb-1 text-center">
+                Enter 6-Digit Code sent to <span className="text-amber-400">{phone}</span>
+              </label>
               <input
                 type="text"
                 required
                 value={otpCode}
                 onChange={(e) => setOtpCode(e.target.value)}
                 placeholder="123456"
-                className="w-full bg-slate-950 border border-slate-800 p-3 rounded-xl text-amber-400 font-mono text-center text-lg tracking-widest focus:outline-none focus:border-amber-500"
+                className="w-full bg-slate-950 border border-slate-800 p-3 rounded-xl text-amber-400 font-mono text-center text-xl tracking-widest focus:outline-none focus:border-amber-500"
               />
             </div>
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl transition"
+              className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl transition shadow-lg"
             >
-              {loading ? 'Verifying Code...' : 'Verify & Enter Portal'}
+              {loading ? 'Verifying Code...' : 'Verify Code & Enter Portal'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setAwaitingOtp(false)}
+              className="w-full text-xs text-slate-400 hover:text-white underline text-center block pt-1"
+            >
+              ← Change Phone Number
             </button>
           </form>
         )}
 
+        {/* EMAIL MODE */}
         {authMethod === 'email' && (
           <form onSubmit={handleEmailAuth} className="space-y-4 text-sm">
             {isSignUp && (
