@@ -1,4 +1,5 @@
-﻿'use client';
+﻿import Logo from '@/components/Logo';
+'use client';
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -244,7 +245,8 @@ export default function SignupPage() {
                   </div>
                 </div>
 
-                <div id="recaptcha-container" className="my-2 min-h-[1px]"></div>
+                <div id="recaptcha-container" className="my-2 min-h-[1px]">
+        <div className="flex justify-center mb-6"><Logo width={200} height={70} /></div></div>
 
                 <button
                   type="submit"
@@ -302,4 +304,5 @@ export default function SignupPage() {
     </div>
   );
 }
+
 
