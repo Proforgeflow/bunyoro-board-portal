@@ -1,36 +1,68 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# Bunyoro Board Portal
 
-## Getting Started
+A secure, institutional-style governance portal for board operations, committee oversight, policy tracking, and executive reporting.
 
-First, run the development server:
+## Overview
+
+This project presents a full governance ecosystem with:
+
+- board and council management
+- meeting agenda and minutes workflows
+- approval routing and business compliance oversight
+- institutional reporting and leadership dashboards
+- secure admin visibility for operational teams
+
+## Tech stack
+
+- Next.js 16
+- React 19
+- Tailwind CSS
+- Firebase and Supabase integration-ready clients
+
+## Project structure
+
+- `app/` – application routes and layouts
+- `components/` – reusable UI components
+- `utils/` – Firebase and Supabase client utilities
+- `public/` – static assets
+
+## Local setup
+
+1. Install dependencies:
+   ```bash
+   npm install
+   ```
+2. Create a local environment file:
+   ```bash
+   cp .env.example .env.local
+   ```
+3. Start the development server:
+   ```bash
+   npm run dev
+   ```
+4. Open http://localhost:3000
+
+## Production build
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm run build
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Environment variables
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+Configure the following values in `.env.local` when enabling live Firebase or Supabase integrations:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```env
+NEXT_PUBLIC_FIREBASE_API_KEY=
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=
+NEXT_PUBLIC_FIREBASE_APP_ID=
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+```
 
-## Learn More
+## Notes
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+The current UI is designed as a polished institutional front-end demonstration and can be extended with real authentication, database records, and document workflows.
