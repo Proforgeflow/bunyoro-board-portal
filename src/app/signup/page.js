@@ -1,5 +1,5 @@
-﻿import Logo from '@/components/Logo';
-'use client';
+﻿'use client';
+import Logo from '../../components/Logo';
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
