@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { auth } from '../../lib/firebase';
 import { addMember } from '@/lib/members';
 
 export default function SignupPage() {
@@ -302,3 +302,4 @@ export default function SignupPage() {
     </div>
   );
 }
+
