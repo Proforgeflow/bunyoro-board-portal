@@ -1,9 +1,6 @@
-﻿export const storageKey = 'bunyoro_board_members';
+﻿import { createClient } from '@/utils/supabase/client';
 
-export const seedMembers = [
-  { id: '1', name: 'Mbabazi Rose', email: 'mbabazi@example.com', role: 'Shareholder', shares: 500, amountPaid: 5000000, status: 'Active' },
-  { id: '2', name: 'John Kyaligonza Lugard', email: 'john@example.com', role: 'Board Member', shares: 1000, amountPaid: 10000000, status: 'Active' },
-];
+const supabase = createClient();
 
 export const formatCurrency = (amount) => {
   return new Intl.NumberFormat('en-UG', {
@@ -15,40 +12,52 @@ export const formatCurrency = (amount) => {
 
 export const formatUGX = formatCurrency;
 
-export const getMembers = () => {
-  if (typeof window === 'undefined') return seedMembers;
-  const stored = localStorage.getItem(storageKey);
-  if (!stored) {
-    localStorage.setItem(storageKey, JSON.stringify(seedMembers));
-    return seedMembers;
+export const getMembers = async () => {
+  const { data, error } = await supabase
+    .from('members')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching members from Supabase:', error.message);
+    return [];
   }
-  try {
-    return JSON.parse(stored);
-  } catch {
-    return seedMembers;
-  }
+  return data || [];
 };
 
-export const saveMembers = (members) => {
-  if (typeof window !== 'undefined') {
-    localStorage.setItem(storageKey, JSON.stringify(members));
+export const addMember = async (newMember) => {
+  const { data, error } = await supabase
+    .from('members')
+    .insert([
+      {
+        name: newMember.name,
+        email: newMember.email,
+        role: newMember.role || 'Member',
+        shares: Number(newMember.shares || 0),
+        amount_paid: Number(newMember.amountPaid || newMember.amount_paid || 0),
+        status: newMember.status || 'Pending',
+      },
+    ])
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error inserting member into Supabase:', error.message);
+    throw error;
   }
+  return data;
 };
 
-export const addMember = (newMember) => {
-  const members = getMembers();
-  const memberToAdd = {
-    id: Date.now().toString(),
-    createdAt: new Date().toISOString(),
-    status: 'Pending',
-    ...newMember,
-  };
-  const updatedMembers = [...members, memberToAdd];
-  saveMembers(updatedMembers);
-  return memberToAdd;
-};
+export const getMemberById = async (id) => {
+  const { data, error } = await supabase
+    .from('members')
+    .select('*')
+    .eq('id', id)
+    .single();
 
-export const getMemberById = (id) => {
-  const members = getMembers();
-  return members.find((m) => m.id === id) || null;
+  if (error) {
+    console.error('Error fetching member by ID from Supabase:', error.message);
+    return null;
+  }
+  return data;
 };
