@@ -31,10 +31,8 @@ export default async function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-blue-600 selection:text-white relative overflow-hidden print:bg-white print:text-black">
-      {/* Background Mesh Gradient */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[400px] bg-gradient-to-b from-blue-600/10 via-amber-500/5 to-transparent blur-3xl pointer-events-none rounded-full print:hidden" />
 
-      {/* Navigation Header */}
       <header className="sticky top-0 z-50 backdrop-blur-xl bg-slate-950/80 border-b border-slate-800/80 px-6 py-4 print:hidden">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-6">
@@ -53,7 +51,6 @@ export default async function AdminDashboard() {
       </header>
 
       <main className="max-w-7xl mx-auto px-6 py-10 print:p-0 print:max-w-none relative z-10">
-        {/* Header Title Section */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-10 gap-6 print:mb-4">
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-400 text-xs font-bold uppercase tracking-widest mb-3 print:hidden">
@@ -73,7 +70,6 @@ export default async function AdminDashboard() {
           </div>
         </div>
 
-        {/* Executive Metric Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10 print:grid-cols-4 print:gap-4 print:mb-6">
           <div className="p-6 rounded-2xl bg-gradient-to-b from-slate-900 to-slate-950 border border-slate-800/90 shadow-xl print:bg-slate-50 print:border-slate-300 print:p-4">
             <div className="text-xs text-slate-400 uppercase font-bold tracking-wider print:text-slate-700">Total Capital Pledged</div>
@@ -97,7 +93,6 @@ export default async function AdminDashboard() {
           </div>
         </div>
 
-        {/* Shareholder Registry Table Container */}
         <div className="rounded-2xl border border-slate-800/90 bg-slate-900/60 shadow-2xl backdrop-blur-md overflow-hidden print:bg-white print:border-slate-300">
           <div className="px-6 py-5 border-b border-slate-800 flex items-center justify-between print:border-slate-300 print:py-2">
             <div className="flex items-center gap-3">
@@ -119,6 +114,7 @@ export default async function AdminDashboard() {
                   <th className="px-6 py-4 print:px-3 print:py-2">Capital Contribution</th>
                   <th className="px-6 py-4 print:px-3 print:py-2">Channel</th>
                   <th className="px-6 py-4 print:px-3 print:py-2">Status</th>
+                  <th className="px-6 py-4 text-right print:hidden">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/80 print:divide-slate-200">
@@ -144,6 +140,14 @@ export default async function AdminDashboard() {
                       }`}>
                         {m.payment_status}
                       </span>
+                    </td>
+                    <td className="px-6 py-4 text-right print:hidden">
+                      <Link
+                        href={`/certificates/${m.id}`}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600/10 border border-blue-500/30 text-blue-400 hover:bg-blue-600 hover:text-white text-xs font-bold transition-all shadow-sm"
+                      >
+                        Certificate →
+                      </Link>
                     </td>
                   </tr>
                 ))}
