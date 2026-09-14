@@ -1,5 +1,6 @@
 ﻿import Link from 'next/link';
 import Logo from '../../components/Logo';
+import RecordShareModal from '../../components/RecordShareModal';
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
@@ -29,7 +30,6 @@ export default async function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans">
-      {/* Header Navigation */}
       <header className="sticky top-0 z-50 backdrop-blur-md bg-slate-950/80 border-b border-slate-800 px-6 py-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-6">
@@ -53,13 +53,10 @@ export default async function AdminDashboard() {
             <p className="text-slate-400 text-sm mt-1">Track share capital contributions, bank settlements, and member voting weights.</p>
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-xs text-slate-400 bg-slate-900 border border-slate-800 px-3 py-2 rounded-lg">
-              Share Value: <strong className="text-white">UGX 100,000 / Share</strong>
-            </span>
+            <RecordShareModal />
           </div>
         </div>
 
-        {/* Financial & Equity Snapshot */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
           <div className="p-6 rounded-xl bg-slate-900 border border-slate-800">
             <div className="text-xs text-slate-400 uppercase font-semibold">Total Capital Pledged</div>
@@ -83,7 +80,6 @@ export default async function AdminDashboard() {
           </div>
         </div>
 
-        {/* Member Shareholder Ledger Table */}
         <div className="rounded-xl border border-slate-800 bg-slate-900 overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
             <h2 className="text-lg font-bold text-white">Shareholder Registry</h2>
