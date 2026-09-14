@@ -5,9 +5,18 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 const supabase = (supabaseUrl && supabaseKey) ? createClient(supabaseUrl, supabaseKey) : null;
 
+// Health Check Endpoint (GET)
+export async function GET() {
+  return NextResponse.json({
+    status: 'online',
+    service: 'Stanbic Bank Webhook Listener',
+    supported_methods: ['POST']
+  }, { status: 200 });
+}
+
+// Transaction Webhook Endpoint (POST)
 export async function POST(request) {
   try {
-    // 1. Verify Webhook Authorization Header
     const authHeader = request.headers.get('x-stanbic-signature') || request.headers.get('authorization');
     const expectedSecret = process.env.STANBIC_WEBHOOK_SECRET;
 
@@ -15,17 +24,15 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Unauthorized signature' }, { status: 401 });
     }
 
-    // 2. Parse Bank Payload
     const payload = await request.json();
-    const { reference, phone_number, status, amount_ugx } = payload;
+    const { reference, phone_number, status } = payload;
 
     if (!supabase) {
       return NextResponse.json({ error: 'Database client uninitialized' }, { status: 500 });
     }
 
-    // 3. Auto-Approve Deposit on Success Status
     if (status === 'SUCCESS' || status === 'COMPLETED') {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('member_shares')
         .update({ 
           payment_status: 'Approved',
