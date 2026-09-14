@@ -36,7 +36,7 @@ export default async function AdminDashboard() {
           <div className="flex items-center gap-4">
             <Link href="/" className="text-xs font-semibold text-slate-400 hover:text-white px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 transition-all">
               ← Main Portal
-            </Link>
+            </Link><Link href="/admin/audit" className="text-xs font-bold text-amber-400 hover:text-amber-300 px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 transition-all">Audit Logs →</Link>
           </div>
         </div>
       </header>
@@ -149,3 +149,4 @@ export default async function AdminDashboard() {
     </div>
   );
 }
+
