@@ -21,6 +21,33 @@ const firebaseConfig = {
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const auth = getAuth(app);
 
+const normalizePhoneNumber = (rawValue: string) => {
+  const value = (rawValue || '').trim();
+  if (!value) return '';
+
+  const cleaned = value.replace(/[\s()\-]/g, '');
+  if (!cleaned) return '';
+
+  if (cleaned.startsWith('+')) return cleaned;
+
+  if (/^\d{10,15}$/.test(cleaned)) return `+${cleaned}`;
+
+  return cleaned;
+};
+
+const isSupportedPhoneNumber = (rawValue: string) => {
+  const value = normalizePhoneNumber(rawValue);
+  const supportedPatterns = [
+    /^\+1\d{10}$/,
+    /^\+971\d{9,10}$/,
+    /^\+966\d{9,10}$/,
+    /^\+256\d{9,10}$/,
+    /^\+\d{11,15}$/,
+  ];
+
+  return supportedPatterns.some((pattern) => pattern.test(value));
+};
+
 export default function LoginPage() {
   const router = useRouter();
   const supabase = createClient();
@@ -57,13 +84,32 @@ export default function LoginPage() {
     setError(null);
 
     try {
+      const normalizedPhone = normalizePhoneNumber(phone);
+
+      if (!isSupportedPhoneNumber(normalizedPhone)) {
+        setError('Use a valid full phone number with country code, e.g. +1..., +971..., +966..., or +256....');
+        return;
+      }
+
       const appVerifier = (window as any).recaptchaVerifier;
-      const result = await signInWithPhoneNumber(auth, phone, appVerifier);
+      const result = await signInWithPhoneNumber(auth, normalizedPhone, appVerifier);
+      setPhone(normalizedPhone);
       setConfirmationResult(result);
       setStep('verify');
     } catch (err: any) {
       console.error(err);
-      setError(err.message || 'Failed to dispatch verification code. Ensure your phone number includes country code.');
+
+      if (err?.code === 'auth/operation-not-allowed') {
+        setError('Phone sign-in is disabled in your Firebase project. Open Firebase Console → Authentication → Sign-in method → Phone → Enable it, then try again.');
+      } else if (err?.code === 'auth/invalid-phone-number') {
+        setError('The phone number format is invalid. Include the country code, for example +256..., +971..., +966..., or +1....');
+      } else if (err?.code === 'auth/missing-phone-number') {
+        setError('Please enter a valid mobile number before requesting the OTP code.');
+      } else if (err?.message?.includes('region') || err?.message?.includes('SMS unable to be sent')) {
+        setError('Firebase blocked SMS from this region. Enable Phone Authentication in the Firebase project and confirm the region is allowed for your billing/project setup.');
+      } else {
+        setError(err.message || 'Failed to dispatch verification code. Ensure your phone number includes country code.');
+      }
     } finally {
       setLoading(false);
     }
@@ -176,7 +222,7 @@ export default function LoginPage() {
                     required
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    placeholder="+971552372079"
+                    placeholder="+256700000000 / +971500000000 / +966500000000 / +15551234567"
                     className="w-full px-4 py-3 bg-slate-950/90 border border-slate-800 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all"
                   />
                 </div>

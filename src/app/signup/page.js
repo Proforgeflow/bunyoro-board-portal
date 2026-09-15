@@ -8,6 +8,32 @@ import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
 import { auth } from '../../lib/firebase';
 import { addMember } from '@/lib/members';
 
+const normalizePhoneNumber = (rawValue) => {
+  const value = (rawValue || '').trim();
+  if (!value) return '';
+
+  const cleaned = value.replace(/[\s()\-]/g, '');
+  if (!cleaned) return '';
+
+  if (cleaned.startsWith('+')) return cleaned;
+  if (/^\d{10,15}$/.test(cleaned)) return `+${cleaned}`;
+
+  return cleaned;
+};
+
+const isSupportedPhoneNumber = (rawValue) => {
+  const value = normalizePhoneNumber(rawValue);
+  const supportedPatterns = [
+    /^\+1\d{10}$/,
+    /^\+971\d{9,10}$/,
+    /^\+966\d{9,10}$/,
+    /^\+256\d{9,10}$/,
+    /^\+\d{11,15}$/,
+  ];
+
+  return supportedPatterns.some((pattern) => pattern.test(value));
+};
+
 export default function SignupPage() {
   const router = useRouter();
   const [authMethod, setAuthMethod] = useState('sms');
@@ -60,9 +86,17 @@ export default function SignupPage() {
 
     try {
       if (authMethod === 'sms') {
+        const normalizedPhone = normalizePhoneNumber(formData.phone);
+
+        if (!isSupportedPhoneNumber(normalizedPhone)) {
+          setErrorMsg('Use a valid full phone number with country code, e.g. +1..., +971..., +966..., or +256....');
+          return;
+        }
+
         setupRecaptcha();
         const appVerifier = window.recaptchaVerifier;
-        const confirmation = await signInWithPhoneNumber(auth, formData.phone, appVerifier);
+        const confirmation = await signInWithPhoneNumber(auth, normalizedPhone, appVerifier);
+        setFormData((prev) => ({ ...prev, phone: normalizedPhone }));
         setConfirmationResult(confirmation);
       } else {
         // Standard Direct Email Sign-up
@@ -71,7 +105,17 @@ export default function SignupPage() {
       }
     } catch (err) {
       console.error('Auth Error:', err);
-      setErrorMsg(err.message || 'Failed to send SMS code. Check phone number format.');
+
+      if (err?.code === 'auth/operation-not-allowed') {
+        setErrorMsg('Phone sign-in is disabled in your Firebase project. Go to Firebase Console → Authentication → Sign-in method → Phone → Enable it, then try again.');
+      } else if (err?.code === 'auth/invalid-phone-number') {
+        setErrorMsg('The phone number format is invalid. Include the country code, for example +256..., +971..., +966..., or +1....');
+      } else if (err?.message?.includes('region') || err?.message?.includes('SMS unable to be sent')) {
+        setErrorMsg('Firebase blocked SMS from this region. Enable Phone Authentication and confirm the project/region is allowed for OTP delivery.');
+      } else {
+        setErrorMsg(err.message || 'Failed to send SMS code. Check phone number format.');
+      }
+
       if (window.recaptchaVerifier) {
         try {
           window.recaptchaVerifier.render().then((widgetId) => {
@@ -202,7 +246,7 @@ export default function SignupPage() {
                     <input
                       type="tel"
                       required
-                      placeholder="+256700000000"
+                      placeholder="+256700000000 / +971500000000 / +966500000000 / +15551234567"
                       className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-sm text-white focus:outline-none focus:border-amber-500"
                       value={formData.phone}
                       onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
